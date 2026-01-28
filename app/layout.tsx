@@ -1,0 +1,23 @@
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata: Metadata = {
+  title: 'URL Shortener - Fast & Reliable Link Shortening',
+  description:
+    'Shorten your URLs instantly with our fast and reliable URL shortener. Get analytics, QR codes, and custom aliases.',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang='en'>
+      <body className={inter.className}>{children}</body>
+    </html>
+  );
+}
