@@ -2,152 +2,76 @@ name: Frontend CD
 
 on:
   workflow_run:
-    workflows: ["Frontend CI"]
+    workflows: ['Frontend CI']
     types: [completed]
     branches: [main]
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   deploy:
-    name: Deploy to Droplet
+    name: Build & Deploy Frontend
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-    
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to DigitalOcean
-        uses: appleboy/ssh-action@master
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            # NOTE: These variables are baked into the image at build time!
+            # Ensure your droplet IP is reachable.
+            NEXT_PUBLIC_API_URL=http://${{ secrets.DROPLET_IP }}/api
+
+      - name: Deploy to Droplet
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DROPLET_IP }}
           username: ${{ secrets.DROPLET_USER || 'root' }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            # Navigate to repository root
+            # Navigate to ROOT project directory
             cd /opt/url-shortener || exit 1
 
-            # Pull latest code
-            echo "📥 Pulling latest changes..."
-            git fetch origin
-            git reset --hard origin/main
+            echo "🚀 Deploying Frontend..."
 
-            # Navigate to frontend directory
-            cd frontend
+            # Pull latest frontend image
+            echo "📥 Pulling latest image..."
+            docker compose pull frontend
 
-            # Stop existing container
-            echo "🛑 Stopping existing container..."
-            docker stop url-shortener-frontend || true
-            docker rm url-shortener-frontend || true
+            # Restart frontend service
+            echo "🔄 Restarting frontend..."
+            docker compose up -d frontend
 
-            # Build new image
-            echo "🐳 Building frontend Docker image..."
-            docker build -t url-shortener-frontend:latest .
+            # Remove unused images
+            docker image prune -f
 
-            # Run new container
-            echo "🔄 Starting frontend container..."
-            docker run -d \
-              --name url-shortener-frontend \
-              --restart unless-stopped \
-              -p 3000:3000 \
-              -e NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8080' }} \
-              -e NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' }} \
-              url-shortener-frontend:latest
-
-            # Clean up old images
-            echo "🧹 Cleaning up old Docker images..."
-            docker image prune -af --filter "until=24h"
-
-      - name: Verify Deployment
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.DROPLET_IP }}
-          username: ${{ secrets.DROPLET_USER || 'root' }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            # Wait for frontend to start
-            echo "⏳ Waiting for frontend to start..."
-            sleep 10
-
-            # Check if frontend container is running
-            echo "📊 Checking frontend container..."
-            if ! docker ps | grep -q "url-shortener-frontend"; then
-              echo "❌ Frontend container is not running"
-              docker logs url-shortener-frontend --tail=50
-              exit 1
-            fi
-
-            # Health check - Frontend
-            echo "🏥 Checking frontend health..."
-            FRONTEND_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 || echo "000")
-            if [ "$FRONTEND_HEALTH" != "200" ]; then
-              echo "❌ Frontend health check failed (HTTP $FRONTEND_HEALTH)"
-              docker logs url-shortener-frontend --tail=50
-              exit 1
-            fi
-
-            echo ""
-            echo "🎉 Frontend deployment successful!"
-            echo ""
-            echo "📍 Access your frontend:"
-            echo "   Internal: http://localhost:3000"
-            echo "   External: http://${{ secrets.DROPLET_IP }}:3000"
-
-      - name: Rollback on Failure
-        if: failure()
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.DROPLET_IP }}
-          username: ${{ secrets.DROPLET_USER || 'root' }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            cd /opt/url-shortener || exit 0
-            echo "⚠️  Deployment failed, rolling back..."
-
-            # Rollback to previous commit
-            git reset --hard HEAD~1
-
-            # Navigate to frontend directory
-            cd frontend
-
-            # Stop current container
-            docker stop url-shortener-frontend || true
-            docker rm url-shortener-frontend || true
-
-            # Rebuild and restart with old version
-            docker build -t url-shortener-frontend:latest .
-            docker run -d \
-              --name url-shortener-frontend \
-              --restart unless-stopped \
-              -p 3000:3000 \
-              -e NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8080' }} \
-              -e NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' }} \
-              url-shortener-frontend:latest
-
-            echo "↩️  Rolled back to previous version"
-
-      - name: Deployment Summary
-        if: always()
-        run: |
-          echo "## 🚀 Frontend Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Server:** ${{ secrets.DROPLET_IP }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "### ✅ Deployment Successful!" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Frontend deployed and running**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Access URLs:**" >> $GITHUB_STEP_SUMMARY
-            echo "- Internal: http://localhost:3000" >> $GITHUB_STEP_SUMMARY
-            echo "- External: http://${{ secrets.DROPLET_IP }}:3000" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The deployment was rolled back." >> $GITHUB_STEP_SUMMARY
-          fi
+            echo "✅ Frontend deployed successfully!"
