@@ -2,7 +2,8 @@
 
 Modern, responsive Next.js frontend for the URL shortener service.
 
-![CI](https://github.com/yourusername/url-shortener-frontend/workflows/Frontend%20CI%2FCD/badge.svg)
+![CI](https://github.com/link-achievagemilang-live/frontend/workflows/Frontend%20CI/badge.svg)
+![CD](https://github.com/link-achievagemilang-live/frontend/workflows/Frontend%20CD/badge.svg)
 
 ## Features
 
