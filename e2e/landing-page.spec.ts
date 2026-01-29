@@ -30,11 +30,11 @@ test.describe('URL Shortener - Landing Page', () => {
   });
 
   test('should display feature cards', async ({ page }) => {
-    // Check for feature cards
-    await expect(page.getByText('Lightning Fast')).toBeVisible();
-    await expect(page.getByText('Custom Aliases')).toBeVisible();
-    await expect(page.getByText('Analytics')).toBeVisible();
-    await expect(page.getByText('Secure & Reliable')).toBeVisible();
+    // Check for feature cards using heading role for specificity
+    await expect(page.getByRole('heading', { name: 'Lightning Fast' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Custom Aliases' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Secure & Reliable' })).toBeVisible();
   });
 
   test('should validate empty URL submission', async ({ page }) => {
@@ -86,7 +86,7 @@ test.describe('URL Shortener - Responsive Design', () => {
     await page.goto('/');
 
     // Check that feature cards are visible on tablet
-    await expect(page.getByText('Lightning Fast')).toBeVisible();
-    await expect(page.getByText('Custom Aliases')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Lightning Fast' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Custom Aliases' })).toBeVisible();
   });
 });

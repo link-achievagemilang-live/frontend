@@ -2,9 +2,31 @@ import { expect, test } from '@playwright/test';
 
 // Mock API server URL - update based on your setup
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 test.describe('URL Shortener - Create Short URL Flow', () => {
   test.beforeEach(async ({ page }) => {
+    // Mock API responses for CI/CD environments
+    await page.route('**/api/v1/urls', async (route) => {
+      if (route.request().method() === 'POST') {
+        const postData = route.request().postDataJSON();
+        const shortCode = postData.custom_alias || 'abc123';
+        
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            short_code: shortCode,
+            short_url: `${BASE_URL}/${shortCode}`,
+            long_url: postData.long_url,
+            created_at: new Date().toISOString(),
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     await page.goto('/');
   });
 
@@ -34,7 +56,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
 
   test('should create a short URL with custom alias', async ({ page }) => {
     const timestamp = Date.now();
-    const customAlias = `test-${timestamp}`;
+    const customAlias = `test${timestamp}`;
 
     // Fill in the URL
     const urlInput = page.getByPlaceholder(/Enter your long URL/i);
@@ -113,6 +135,21 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
   });
 
   test('should navigate to analytics page', async ({ page }) => {
+    // Mock analytics API as well
+    await page.route('**/api/v1/analytics/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          short_code: 'abc123',
+          short_url: `${BASE_URL}/abc123`,
+          long_url: 'https://www.example.com',
+          created_at: new Date().toISOString(),
+          clicks: 42,
+        }),
+      });
+    });
+
     // Create a short URL
     const urlInput = page.getByPlaceholder(/Enter your long URL/i);
     await urlInput.fill('https://www.example.com');
