@@ -52,8 +52,8 @@ test.describe('URL Shortener - Landing Page', () => {
     const submitButton = page.getByRole('button', { name: /Shorten URL/i });
     await submitButton.click();
 
-    // Should show validation error (text contains "Please enter a valid URL")
-    await expect(page.getByText(/Please enter a valid URL/i)).toBeVisible({ timeout: 5000 });
+    // Should show validation error - the actual error message includes the full text
+    await expect(page.getByText(/Please enter a valid URL \(including http:\/\/ or https:\/\/\)/i)).toBeVisible({ timeout: 5000 });
   });
 
   test('should show loading state when submitting', async ({ page }) => {

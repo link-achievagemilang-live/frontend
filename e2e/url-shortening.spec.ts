@@ -80,7 +80,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     await submitButton.click();
 
     // Wait for result
-    await page.waitForSelector('text=/Short URL created/i', { timeout: 10000 });
+    await page.waitForSelector('text=/URL Shortened Successfully/i', { timeout: 10000 });
 
     // Check that custom alias is in the URL
     const shortUrlElement = page
@@ -101,7 +101,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     await submitButton.click();
 
     // Wait for result
-    await page.waitForSelector('text=/Short URL created/i', { timeout: 10000 });
+    await page.waitForSelector('text=/URL Shortened Successfully/i', { timeout: 10000 });
 
     // Click copy button
     const copyButton = page.getByRole('button', { name: /Copy/i }).first();
@@ -120,7 +120,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     await submitButton.click();
 
     // Wait for result
-    await page.waitForSelector('text=/Short URL created/i', { timeout: 10000 });
+    await page.waitForSelector('text=/URL Shortened Successfully/i', { timeout: 10000 });
 
     // Click QR code toggle
     const qrToggle = page.getByRole('button', { name: /QR Code/i });
@@ -146,7 +146,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
           short_url: `${BASE_URL}/abc123`,
           long_url: 'https://www.example.com',
           created_at: new Date().toISOString(),
-          clicks: 42,
+          click_count: 42,
         }),
       });
     });
@@ -159,7 +159,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     await submitButton.click();
 
     // Wait for result
-    await page.waitForSelector('text=/Short URL created/i', { timeout: 10000 });
+    await page.waitForSelector('text=/URL Shortened Successfully/i', { timeout: 10000 });
 
     // Click analytics link
     const analyticsLink = page.getByRole('link', { name: /View Analytics/i });

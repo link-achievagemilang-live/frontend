@@ -103,8 +103,8 @@ test.describe('Analytics Page', () => {
     // Wait for page to load
     await page.waitForLoadState('networkidle');
 
-    // Look for QR code section
-    const qrSection = page.getByText(/QR Code/i);
+    // Look for QR code section heading (more specific selector to avoid strict mode violation)
+    const qrSection = page.getByRole('heading', { name: /QR Code/i });
     if (await qrSection.isVisible()) {
       await expect(qrSection).toBeVisible();
 
