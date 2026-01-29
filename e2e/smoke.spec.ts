@@ -54,7 +54,7 @@ test.describe('Smoke Tests', () => {
     await page.waitForTimeout(2000);
     
     // Check for short URL in the result component
-    const resultElement = await page.locator('text=Short URL created').isVisible().catch(() => false);
+    const resultElement = await page.locator('text=URL Shortened Successfully').isVisible().catch(() => false);
     if (resultElement) {
       // If result component is visible, check for test123
       await expect(page.locator('text=/test123/')).toBeVisible({ timeout: 5000 });
@@ -76,7 +76,7 @@ test.describe('Smoke Tests', () => {
           short_url: `${BASE_URL}/test123`,
           long_url: 'https://www.example.com',
           created_at: new Date().toISOString(),
-          clicks: 42,
+          click_count: 42,
         }),
       });
     });

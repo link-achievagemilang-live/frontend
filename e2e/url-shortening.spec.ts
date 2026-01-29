@@ -41,7 +41,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     await submitButton.click();
 
     // Wait for the result to appear
-    await page.waitForSelector('text=/Short URL created/i', { timeout: 10000 });
+    await page.waitForSelector('text=/URL Shortened Successfully/i', { timeout: 10000 });
 
     // Check that the short URL is displayed
     const shortUrlElement = page

@@ -16,7 +16,7 @@ test.describe('Analytics Page', () => {
           short_url: `${BASE_URL}/test123`,
           long_url: 'https://www.example.com',
           created_at: new Date().toISOString(),
-          clicks: 42,
+          click_count: 42,
         }),
       });
     });
@@ -66,7 +66,7 @@ test.describe('Analytics Page', () => {
           short_url: `${BASE_URL}/test123`,
           long_url: 'https://www.example.com',
           created_at: new Date().toISOString(),
-          clicks: 42,
+          click_count: 42,
         }),
       });
     });
@@ -93,7 +93,7 @@ test.describe('Analytics Page', () => {
           short_url: `${BASE_URL}/test123`,
           long_url: 'https://www.example.com',
           created_at: new Date().toISOString(),
-          clicks: 42,
+          click_count: 42,
         }),
       });
     });
@@ -127,7 +127,7 @@ test.describe('Analytics Page - Responsive', () => {
           short_url: `${BASE_URL}/test123`,
           long_url: 'https://www.example.com',
           created_at: new Date().toISOString(),
-          clicks: 42,
+          click_count: 42,
         }),
       });
     });
