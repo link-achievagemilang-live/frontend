@@ -115,10 +115,24 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     // Mock clipboard API to avoid permission issues and ensuring success state
     await page.evaluate(() => {
       // @ts-ignore
-      if (!navigator.clipboard) {
-        navigator.clipboard = {};
+      const mockClipboard = {
+        writeText: async () => Promise.resolve(),
+      };
+
+      try {
+        if (navigator.clipboard) {
+          Object.defineProperty(navigator, 'clipboard', {
+            value: mockClipboard,
+            configurable: true,
+            writable: true,
+          });
+        } else {
+          // @ts-ignore
+          navigator.clipboard = mockClipboard;
+        }
+      } catch (e) {
+        // If defineProperty fails (unlikely in test env but possible), we might be stuck
       }
-      navigator.clipboard.writeText = async () => Promise.resolve();
     });
 
     // Create a short URL
