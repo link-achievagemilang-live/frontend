@@ -7,13 +7,14 @@ test.describe('Smoke Tests', () => {
     await page.goto('/');
     
     // Wait for the page to load
-    await page.waitForLoadState('domcontentloaded');
+    await page.waitForLoadState('networkidle');
     
     // Check that the page title is correct
     await expect(page).toHaveTitle(/URL Shortener|link.achievagemilang.live/i);
     
     // Check for main heading
-    await expect(page.locator('h1')).toContainText(/Shorten URLs/i);
+    const heading = page.locator('h1').filter({ hasText: /Shorten URLs/i });
+    await expect(heading).toBeVisible({ timeout: 10000 });
   });
 
   test('should have working form with mocked API', async ({ page }) => {

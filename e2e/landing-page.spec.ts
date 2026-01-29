@@ -21,7 +21,7 @@ test.describe('URL Shortener - Landing Page', () => {
 
   test('should display the URL shortener form', async ({ page }) => {
     // Check for input field
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await expect(urlInput).toBeVisible();
 
     // Check for submit button
@@ -46,7 +46,7 @@ test.describe('URL Shortener - Landing Page', () => {
   });
 
   test('should validate invalid URL format', async ({ page }) => {
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await urlInput.fill('not-a-valid-url');
 
     const submitButton = page.getByRole('button', { name: /Shorten URL/i });
@@ -57,7 +57,7 @@ test.describe('URL Shortener - Landing Page', () => {
   });
 
   test('should show loading state when submitting', async ({ page }) => {
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await urlInput.fill('https://www.example.com');
 
     const submitButton = page.getByRole('button', { name: /Shorten URL/i });
@@ -77,7 +77,7 @@ test.describe('URL Shortener - Responsive Design', () => {
 
     // Check that main elements are visible on mobile
     await expect(page.getByText('Shorten URLs')).toBeVisible();
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await expect(urlInput).toBeVisible();
   });
 

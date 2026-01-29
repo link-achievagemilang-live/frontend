@@ -31,8 +31,9 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
   });
 
   test('should create a short URL successfully', async ({ page }) => {
-    // Fill in the URL
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    // Fill in the URL using ID selector (more reliable)
+    const urlInput = page.locator('#longUrl');
+    await urlInput.waitFor({ state: 'visible' });
     await urlInput.fill('https://www.google.com');
 
     // Submit the form
@@ -59,7 +60,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     const customAlias = `test${timestamp}`;
 
     // Fill in the URL
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await urlInput.fill('https://www.github.com');
 
     // Click on advanced options to reveal custom alias field
@@ -93,7 +94,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
     // Create a short URL
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await urlInput.fill('https://www.example.com');
 
     const submitButton = page.getByRole('button', { name: /Shorten URL/i });
@@ -112,7 +113,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
 
   test('should toggle QR code display', async ({ page }) => {
     // Create a short URL
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await urlInput.fill('https://www.example.com');
 
     const submitButton = page.getByRole('button', { name: /Shorten URL/i });
@@ -151,7 +152,7 @@ test.describe('URL Shortener - Create Short URL Flow', () => {
     });
 
     // Create a short URL
-    const urlInput = page.getByPlaceholder(/Enter your long URL/i);
+    const urlInput = page.locator('#longUrl');
     await urlInput.fill('https://www.example.com');
 
     const submitButton = page.getByRole('button', { name: /Shorten URL/i });
