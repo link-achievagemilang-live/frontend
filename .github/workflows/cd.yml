@@ -1,30 +1,23 @@
 name: Frontend CD
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Frontend CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
 
 jobs:
   deploy:
-    name: Deploy to DigitalOcean
+    name: Deploy to Droplet
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'production' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy Full Stack to Droplet
+      - name: Deploy to DigitalOcean
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DROPLET_IP }}
@@ -32,7 +25,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            # Navigate to project directory
+            # Navigate to repository root
             cd /opt/url-shortener || exit 1
 
             # Pull latest code
@@ -40,34 +33,27 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
-            # Update environment variables for production
-            echo "⚙️  Updating environment variables..."
-            
-            # Backend .env
-            cd backend
-            if [ ! -f .env ]; then
-              echo "❌ Backend .env file not found!"
-              exit 1
-            fi
-            
-            # Frontend .env (create if doesn't exist)
-            cd ../frontend
-            cat > .env.production << EOF
-            NEXT_PUBLIC_API_URL=http://${{ secrets.DROPLET_IP }}/api
-            NEXT_PUBLIC_BASE_URL=http://${{ secrets.DROPLET_IP }}
-            EOF
-            
-            # Return to root
-            cd ..
+            # Navigate to frontend directory
+            cd frontend
 
-            # Pull latest Docker images and rebuild
-            echo "🐳 Rebuilding Docker images..."
-            docker compose pull || true
-            docker compose build --no-cache frontend
+            # Stop existing container
+            echo "🛑 Stopping existing container..."
+            docker stop url-shortener-frontend || true
+            docker rm url-shortener-frontend || true
 
-            # Restart all services
-            echo "🔄 Restarting services..."
-            docker compose up -d --remove-orphans
+            # Build new image
+            echo "🐳 Building frontend Docker image..."
+            docker build -t url-shortener-frontend:latest .
+
+            # Run new container
+            echo "🔄 Starting frontend container..."
+            docker run -d \
+              --name url-shortener-frontend \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -e NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8080' }} \
+              -e NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' }} \
+              url-shortener-frontend:latest
 
             # Clean up old images
             echo "🧹 Cleaning up old Docker images..."
@@ -81,78 +67,33 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            cd /opt/url-shortener
+            # Wait for frontend to start
+            echo "⏳ Waiting for frontend to start..."
+            sleep 10
 
-            # Wait for services to start
-            echo "⏳ Waiting for services to start..."
-            sleep 15
-
-            # Check if containers are running
-            echo "📊 Checking container status..."
-            RUNNING_CONTAINERS=$(docker compose ps --services --filter "status=running" | wc -l)
-            TOTAL_CONTAINERS=$(docker compose ps --services | wc -l)
-
-            echo "Running containers: $RUNNING_CONTAINERS/$TOTAL_CONTAINERS"
-            docker compose ps
-
-            if [ "$RUNNING_CONTAINERS" -lt "$TOTAL_CONTAINERS" ]; then
-              echo "❌ Deployment failed: Not all containers are running"
-              docker compose logs --tail=50
+            # Check if frontend container is running
+            echo "📊 Checking frontend container..."
+            if ! docker ps | grep -q "url-shortener-frontend"; then
+              echo "❌ Frontend container is not running"
+              docker logs url-shortener-frontend --tail=50
               exit 1
             fi
-
-            # Health check - Backend
-            echo "🏥 Checking backend health..."
-            BACKEND_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health || echo "000")
-            if [ "$BACKEND_HEALTH" != "200" ]; then
-              echo "❌ Backend health check failed (HTTP $BACKEND_HEALTH)"
-              docker compose logs backend --tail=50
-              exit 1
-            fi
-            echo "✅ Backend is healthy"
 
             # Health check - Frontend
             echo "🏥 Checking frontend health..."
             FRONTEND_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 || echo "000")
             if [ "$FRONTEND_HEALTH" != "200" ]; then
               echo "❌ Frontend health check failed (HTTP $FRONTEND_HEALTH)"
-              docker compose logs frontend --tail=50
+              docker logs url-shortener-frontend --tail=50
               exit 1
-            fi
-            echo "✅ Frontend is healthy"
-
-            # Check database connectivity
-            echo "🏥 Checking PostgreSQL..."
-            docker compose exec -T postgres pg_isready -U urlshortener || {
-              echo "❌ PostgreSQL health check failed"
-              exit 1
-            }
-            echo "✅ PostgreSQL is healthy"
-
-            # Check Redis connectivity
-            echo "🏥 Checking Redis..."
-            docker compose exec -T redis redis-cli ping | grep -q PONG || {
-              echo "❌ Redis health check failed"
-              exit 1
-            }
-            echo "✅ Redis is healthy"
-
-            # Check Caddy (reverse proxy)
-            echo "🏥 Checking Caddy reverse proxy..."
-            CADDY_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost || echo "000")
-            if [ "$CADDY_HEALTH" != "200" ]; then
-              echo "⚠️  Caddy might not be configured yet (HTTP $CADDY_HEALTH)"
-            else
-              echo "✅ Caddy is healthy"
             fi
 
             echo ""
-            echo "🎉 Deployment successful! All services are healthy."
+            echo "🎉 Frontend deployment successful!"
             echo ""
-            echo "📍 Access your application:"
-            echo "   Frontend: http://${{ secrets.DROPLET_IP }}:3000"
-            echo "   Backend:  http://${{ secrets.DROPLET_IP }}:8080"
-            echo "   Caddy:    http://${{ secrets.DROPLET_IP }}"
+            echo "📍 Access your frontend:"
+            echo "   Internal: http://localhost:3000"
+            echo "   External: http://${{ secrets.DROPLET_IP }}:3000"
 
       - name: Rollback on Failure
         if: failure()
@@ -163,44 +104,36 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            cd /opt/url-shortener
+            cd /opt/url-shortener || exit 0
             echo "⚠️  Deployment failed, rolling back..."
-
-            # Get previous commit
-            git log -2 --oneline
 
             # Rollback to previous commit
             git reset --hard HEAD~1
 
+            # Navigate to frontend directory
+            cd frontend
+
+            # Stop current container
+            docker stop url-shortener-frontend || true
+            docker rm url-shortener-frontend || true
+
             # Rebuild and restart with old version
-            docker compose build
-            docker compose up -d
+            docker build -t url-shortener-frontend:latest .
+            docker run -d \
+              --name url-shortener-frontend \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              -e NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8080' }} \
+              -e NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' }} \
+              url-shortener-frontend:latest
 
             echo "↩️  Rolled back to previous version"
-            docker compose ps
-
-      - name: Send Deployment Notification
-        if: always()
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.DROPLET_IP }}
-          username: ${{ secrets.DROPLET_USER || 'root' }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            # Log deployment status
-            if [ "${{ job.status }}" = "success" ]; then
-              echo "✅ Frontend deployment completed successfully at $(date)" >> /var/log/url-shortener-deployments.log
-            else
-              echo "❌ Frontend deployment failed at $(date)" >> /var/log/url-shortener-deployments.log
-            fi
 
       - name: Deployment Summary
         if: always()
         run: |
           echo "## 🚀 Frontend Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
           echo "**Server:** ${{ secrets.DROPLET_IP }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -208,21 +141,13 @@ jobs:
           if [ "${{ job.status }}" = "success" ]; then
             echo "### ✅ Deployment Successful!" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Services Deployed:**" >> $GITHUB_STEP_SUMMARY
-            echo "- 🎨 Frontend (Next.js)" >> $GITHUB_STEP_SUMMARY
-            echo "- ⚙️  Backend (Go)" >> $GITHUB_STEP_SUMMARY
-            echo "- 🗄️  PostgreSQL" >> $GITHUB_STEP_SUMMARY
-            echo "- 🔴 Redis" >> $GITHUB_STEP_SUMMARY
-            echo "- 🔀 Caddy Reverse Proxy" >> $GITHUB_STEP_SUMMARY
+            echo "**Frontend deployed and running**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Access URLs:**" >> $GITHUB_STEP_SUMMARY
-            echo "- Frontend: http://${{ secrets.DROPLET_IP }}:3000" >> $GITHUB_STEP_SUMMARY
-            echo "- Backend: http://${{ secrets.DROPLET_IP }}:8080" >> $GITHUB_STEP_SUMMARY
-            echo "- Main (via Caddy): http://${{ secrets.DROPLET_IP }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Internal: http://localhost:3000" >> $GITHUB_STEP_SUMMARY
+            echo "- External: http://${{ secrets.DROPLET_IP }}:3000" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The deployment was rolled back to the previous version." >> $GITHUB_STEP_SUMMARY
-            echo "Check the logs above for details." >> $GITHUB_STEP_SUMMARY
+            echo "The deployment was rolled back." >> $GITHUB_STEP_SUMMARY
           fi
-
