@@ -48,7 +48,8 @@ jobs:
           build-args: |
             # NOTE: These variables are baked into the image at build time!
             # Ensure your droplet IP is reachable.
-            NEXT_PUBLIC_API_URL=http://${{ secrets.DROPLET_IP }}/api
+            # Use relative path so Nginx handles the routing (Same Origin)
+            NEXT_PUBLIC_API_URL=/api
 
       - name: Deploy to Droplet
         uses: appleboy/ssh-action@v1.0.3
